@@ -1,0 +1,65 @@
+#!/bin/sh
+# Start/stop/restart salt master
+
+PIDFILE=/var/run/salt-master.pid
+LOGFILE=/var/log/salt/master
+# LOGLEVEL: One of: all, garbage, trace, debug, info, warning, error, quiet
+LOGLEVEL=warning
+
+# Status salt-master:
+salt_master_status() {
+  STATUS=STOPPED
+  EXITCODE=1
+  echo -n "The salt-master daemon is "
+  if [ $(pgrep -F ${PIDFILE} 2>/dev/null) ]; then
+    STATUS=RUNNING
+    EXITCODE=0
+  fi
+  echo $STATUS
+  exit $EXITCODE
+}
+
+# Start salt-master:
+salt_master_start() {
+  if [ -x /usr/bin/salt-master ]; then
+    echo "Starting salt-master daemon:  /usr/bin/salt-master"
+    /usr/bin/salt-master -d \
+      --pid-file=$PIDFILE \
+      --log-file=$LOGFILE \
+      --log-file-level=$LOGLEVEL
+  fi
+}
+
+# Stop salt-master:
+salt_master_stop() {
+  if [ -s $PIDFILE ] ; then
+    kill $(cat $PIDFILE)
+  else
+    killall salt-master
+  fi
+  rm -f $PIDFILE
+}
+
+# Restart salt-master:
+salt_master_restart() {
+  salt_master_stop
+  sleep 1
+  salt_master_start
+}
+
+case "$1" in
+'start')
+  salt_master_start
+  ;;
+'stop')
+  salt_master_stop
+  ;;
+'restart')
+  salt_master_restart
+  ;;
+'status')
+  salt_master_status
+  ;;
+*)
+  echo "usage $0 start|stop|restart|status"
+esac

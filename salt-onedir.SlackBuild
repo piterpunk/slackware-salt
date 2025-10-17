@@ -1,0 +1,114 @@
+#!/bin/bash
+
+PKGNAME=salt-onedir
+VERSION=${VERSION:-3007.8}
+BUILD=${BUILD:-2}
+TAG=${TAG:-pk}
+ARCH=x86_64
+ONEDIR_RELEASE=salt-${VERSION}-onedir-linux-${ARCH}.tar.xz
+
+CWD=$(pwd)
+TMP=${TMP:-/tmp}
+PKGDIR=${TMP}/salt-onedir-package
+OUTPUT=${OUTPUT:-/tmp}
+DOWNLOAD=${DOWNLOAD:-false}
+
+# Cleanup
+
+rm -rf $PKGDIR
+mkdir -p $TMP $OUTPUT $PKGDIR 
+
+
+if [ "$DOWNLOAD" = "true" ]; then
+  DOWNLOAD_LINK=https://github.com/saltstack/salt/releases/download/v${VERSION}
+  wget ${DOWNLOAD_LINK}/${ONEDIR_RELEASE}
+fi
+
+
+# Create package structure
+( 
+  cd $PKGDIR
+  mkdir -p var/log/salt var/run/salt/master var/cache/salt/minion \
+	   var/cache/salt/master/{tokens,jobs,roots,queues,proc,syndics}
+  mkdir -p etc/salt/{master.d,minion.d} etc/salt/pki/minion etc/rc.d \
+	   etc/salt/pki/master/{minions_pre,minions,minions_denied} \
+	   etc/salt/pki/master/{minions_rejected,minions_autosign}
+  mkdir -p usr/bin usr/man/{man1,man7} opt/saltstack install
+)
+
+# Unpack onedir package
+#
+tar -xvf ${CWD}/${ONEDIR_RELEASE} -C $PKGDIR/opt/saltstack
+
+# Install init scripts
+#
+cp ${CWD}/rc.salt-master.new ${PKGDIR}/etc/rc.d
+cp ${CWD}/rc.salt-minion.new ${PKGDIR}/etc/rc.d
+cp ${CWD}/rc.salt-syndic.new ${PKGDIR}/etc/rc.d
+
+# Copy configuration files
+#
+cp -a ${CWD}/conf/* ${PKGDIR}/etc/salt/
+
+# Install Slackware specific modules
+#
+cp ${CWD}/slackpkg.py \
+   ${PKGDIR}/opt/saltstack/salt/lib/python3.??/site-packages/salt/modules/slackpkg.py
+
+# Applying patches
+( 
+  cd $PKGDIR/opt/saltstack/salt/lib/python3.??/site-packages
+  patch -p1 < ${CWD}/ssh_PR68405.patch
+)
+  
+# Fix permissions
+(
+  cd $PKGDIR
+  chown -R root:root .
+  find -L . \
+     \( -perm 777 -o -perm 775 -o -perm 750 -o -perm 711 -o -perm 555 \
+        -o -perm 511 \) -exec chmod 755 {} \; -o \
+     \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
+        -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \;
+  chmod -R 750 var/log/salt var/run/salt/master var/cache/salt/minion \
+	       var/cache/salt/master etc/salt/pki/master
+)
+
+# Create links for Salt Project commands
+(
+  cd $PKGDIR
+  for CMD in salt salt-api salt-call salt-cloud salt-cp salt-key \
+	     salt-master salt-minion salt-pip salt-proxy salt-run \
+	     salt-ssh salt-syndic; do 
+    ln -sf /opt/saltstack/salt/${CMD} usr/bin/${CMD}
+  done
+)
+
+# Create links for Salt Project manual pages
+( 
+  cd $PKGDIR
+  for MAN1 in $(find opt/saltstack/salt/share/man/man1 -type f) ; do
+    ln -sf /${MAN1} usr/man/man1/$(basename ${MAN1})
+  done
+  for MAN7 in $(find opt/saltstack/salt/share/man/man7 -type f) ; do
+    ln -sf /${MAN7} usr/man/man7/$(basename ${MAN7})
+  done
+)
+
+# Slackware package scripts and information files
+#
+cat $CWD/slack-desc > $PKGDIR/install/slack-desc
+cat $CWD/doinst.sh > $PKGDIR/install/doinst.sh
+
+( 
+  cd $PKGDIR
+  for i in $( find etc/salt -type f ) ; do
+    mv $i $i.new
+    echo "config $i.new" >> $PKGDIR/install/doinst.sh
+  done
+)
+
+# Create package
+#
+cd $PKGDIR
+/sbin/makepkg -l y -c n $OUTPUT/$PKGNAME-$VERSION-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}

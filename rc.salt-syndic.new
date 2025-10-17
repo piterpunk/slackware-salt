@@ -1,0 +1,65 @@
+#!/bin/sh
+# Start/stop/restart salt syndic
+
+PIDFILE=/var/run/salt-syndic.pid
+LOGFILE=/var/log/salt/syndic
+# LOGLEVEL: One of: all, garbage, trace, debug, info, warning, error, quiet
+LOGLEVEL=warning
+
+# Status salt-syndic:
+salt_syndic_status() {
+  STATUS=STOPPED
+  EXITCODE=1
+  echo -n "The salt-syndic daemon is "
+  if [ $(pgrep -F ${PIDFILE} 2>/dev/null) ]; then
+    STATUS=RUNNING
+    EXITCODE=0
+  fi
+  echo $STATUS
+  exit $EXITCODE
+}
+
+# Start salt-syndic:
+salt_syndic_start() {
+  if [ -x /usr/bin/salt-syndic ]; then
+    echo "Starting salt-syndic daemon:  /usr/bin/salt-syndic"
+    /usr/bin/salt-syndic -d \
+      --pid-file=$PIDFILE \
+      --log-file=$LOGFILE \
+      --log-file-level=$LOGLEVEL
+  fi
+}
+
+# Stop salt-syndic:
+salt_syndic_stop() {
+  if [ -s $PIDFILE ] ; then
+    kill $(cat $PIDFILE)
+  else
+    killall salt-syndic
+  fi
+  rm -f $PIDFILE
+}
+
+# Restart salt-syndic:
+salt_syndic_restart() {
+  salt_syndic_stop
+  sleep 1
+  salt_syndic_start
+}
+
+case "$1" in
+'start')
+  salt_syndic_start
+  ;;
+'stop')
+  salt_syndic_stop
+  ;;
+'restart')
+  salt_syndic_restart
+  ;;
+'status')
+  salt_syndic_status
+  ;;
+*)
+  echo "usage $0 start|stop|restart|status"
+esac
