@@ -1,9 +1,11 @@
 # slackware-salt
 
-This repository contains the recipe to build a package for Slackware using the official [Salt Projec](https://saltproject.io/)'s Salt Onedir release with a few extras:
+This repository contains a recipe to build a package for Slackware using the official [Salt Project](https://saltproject.io/)'s Salt Onedir release with a few extras:
 
 - `pkg` execution module to handle Slackware packages. For backend it uses slackpkg and pkgtools.
 - RC-scripts to manage `salt-master`, `salt-minion` and `salt-syndic` daemons.
+
+## How to use this recipe
 
 To use this repository, clone it:
 ```
@@ -25,6 +27,7 @@ Now you need to install or upgrade to this package using `installpkg` or `upgrad
 ```
 installpkg /tmp/salt-onedir-3007.8-x86_64-2pk.tgz
 ```
+## Post-install
 
 After install the package, remember to add something like these lines to your `/etc/rc.d/rc.local`:
 ```
